@@ -1,11 +1,19 @@
 {
+	"fuckingworkyoupieceofshit": {
+		"level": 0,
+		"action": "make me, bitch"
+	},
+	"games": "Next week's game is announced at the end of each session.",
 	"hi": {
 		"level": 1,
 		"action": "fuck you charles"
 	},
-	"bot": "that robot emote",
-	"fuckingworkyoupieceofshit": {
-		"level": 0,
-		"action": "make me, bitch"
-	}
+	"highlight": {
+		"level": 1,
+		"action": "Add to some sort of highlight queue"
+	},
+	"multi": "http://kadgar.net/live/jhobz296/spikevegeta",
+	"uptime": "Figure out the function here",
+	"war": "Shpeel about WAR",
+	"wr": "World record"
 }
