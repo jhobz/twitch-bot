@@ -1,9 +1,11 @@
 {
-	"commands": {
-		"addstreamer": "no",
-		"hi": "fuck you charles",
-		"bot": "that robot emote",
-		"fuckinghell": "fuckin' hell",
-		"fuckingworkyoushit": "make me, bitch"
+	"hi": {
+		"level": 1,
+		"action": "fuck you charles"
+	},
+	"bot": "that robot emote",
+	"fuckingworkyoupieceofshit": {
+		"level": 0,
+		"action": "make me, bitch"
 	}
 }

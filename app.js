@@ -23,6 +23,11 @@ var irc = require('tmi.js'),
 	COMMANDSFILE = 'commands.json',
 
 /**
+ * Location of permissions table.
+ */
+	PERMISSIONSFILE = 'permissions.json',
+
+/**
  * List of channels to which to connect.
  */
 	channels,
@@ -33,9 +38,14 @@ var irc = require('tmi.js'),
 	client,
 
 /**
- * List of commands to listen for.
+ * List of commands to listen for and their corresponding actions
  */
-	commands;
+	commands,
+
+/**
+ * Permissions table
+ */
+	permissions;
 
 /**
  * Initialize the tmi client and connect to channels.
@@ -84,18 +94,28 @@ function initClient() {
 		}
  * @param msg message that was sent
  * @param isSelfMessage true if the message was sent by this bot, false otherwise
+ *        Note: Is false if message was sent from account but not by bot
 */
 function handleMessage( channel, userstate, msg, isSelfMessage ) {
 	// Eliminate whitespace mistakes (e.g. "  !command      param")
-	var split = msg.match( /\S+/g ) || [];
-	if ( isSelfMessage || !split.length ) {
+	var split = msg.match( /\S+/g ) || [],
+		user = userstate['username'];
+
+	if (
+		isSelfMessage
+		|| permissions[user] < 0
+		|| !split.length
+	) {
 		return;
 	}
 
 	var command = split[0].substr( 1 ).toLowerCase(), // remove bang
 		commandAction = commands[command];
 
-	if( commandAction ) {
+	if ( hasPermission( user, commandAction ) ) {
+		if ( commandAction.action ) {
+			commandAction = commandAction.action;
+		}
 		if ( typeof commandAction === 'function' ) {
 			commandAction( split.splice( 1 ), function( message, data ) {
 				//client.say( channel, userstate["display-name"] + " - " + message + "." );
@@ -104,6 +124,27 @@ function handleMessage( channel, userstate, msg, isSelfMessage ) {
 			say( channel, commandAction, userstate );
 		}
 	}
+}
+
+/**
+ * Determine whether a given user can perform a given action
+ * @param user user attempting to perform action
+ * @param action action attempting to be performed
+ * @return boolean
+ */
+function hasPermission( user, action ) {
+	if (
+		!user
+		|| !action
+		|| action.level !== undefined
+		&& (
+			permissions[user] === undefined
+			|| action.level < permissions[user] // Smaller permission number is higher authority
+		)
+	) {
+		return false;
+	}
+	return true;
 }
 
 /**
@@ -125,7 +166,7 @@ function say( channel, msg, userstate ) {
 			client.whisper( userstate['username'], msg );
 			break;
 		default:
-			console.log( 'Unknown message type: ' + userstate['message-type']
+			console.error( 'Unknown message type: ' + userstate['message-type']
 				+ '. Attempted to say: ' + msg );
 			break;
 	}
@@ -151,6 +192,7 @@ function saveJsonToFile( filename, data ) {
     FileSystem.writeFileSync( filename, JSON.stringify( data ) );
 }
 
+
 /**
  * Terminate application
  */
@@ -158,7 +200,7 @@ function quit() {
     channels.forEach( function ( channel ) {
 		say(
 			channel,
-			'Terminating application. Please contact the developer (@J_Hobz)'
+			'Terminating application. Please contact the developer '
 			+ 'on Twitter if no warning was announced prior to termination.',
 			{
 				'message-type': 'chat'
@@ -173,8 +215,9 @@ function quit() {
  * Start main application thread
  */
 function run() {
-	channels = loadJsonFromFile( CHANNELSFILE ).channels;
-	commands = loadJsonFromFile( COMMANDSFILE ).commands;
+	channels = loadJsonFromFile( CHANNELSFILE );
+	commands = loadJsonFromFile( COMMANDSFILE );
+	permissions = loadJsonFromFile( PERMISSIONSFILE );
 
 	client = initClient();
 	client.connect();
