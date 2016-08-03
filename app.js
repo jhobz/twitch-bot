@@ -1,16 +1,47 @@
+'use strict';
+
+/**
+ * node package tmi.js
+ * Used for interacting with Twitch servers and chat.
+ */
 var irc = require('tmi.js'),
-	request = require('request'),
-	fs = require('fs'),
-	_ = require('underscore'),
+
+/**
+ * node package fs
+ * Used for reading from and writing to filesystem.
+ */
+	FileSystem = require('fs'),
+
+/**
+ * Location of list of channels to which to connect.
+ */
 	CHANNELSFILE = 'channels.json',
+
+/**
+ * Location of list of commands to load.
+ */
 	COMMANDSFILE = 'commands.json',
+
+/**
+ * List of channels to which to connect.
+ */
 	channels,
+
+/**
+ * tmi client instance
+ */
 	client,
+
+/**
+ * List of commands to listen for.
+ */
 	commands;
 
-//var clientId = config.clientId || ""; // A client ID technically isn't necessary, but it's nice to include to prevent rate-limits: https://github.com/justintv/Twitch-API#rate-limits
-
-function initClient( channels ) {
+/**
+ * Initialize the tmi client and connect to channels.
+ * @return Promise
+ */
+function initClient() {
 	var options = {
 			options: {
 				debug: true,
@@ -26,41 +57,33 @@ function initClient( channels ) {
 			channels: channels,
 		},
 		client = new irc.client( options );
-	return client;
+		return client;
 }
 
-function loadChannels( filename ) {
-	loadFromFile( filename, function ( response ) {
-		channels = response.channels;
-		console.log(channels);
-	} );
-}
-
-function loadCommands( filename ) {
-	loadFromFile( filename, function ( response ) {
-		commands = response.commands;
-		console.log(commands);
-	} );
-}
-
-/*
- * example userstate object
-	{
-		'badges': { 'broadcaster': '1', 'warcraft': 'horde' },
-		'color': '#FFFFFF',
-		'display-name': 'Schmoopiie',
-		'emotes': { '25': [ '0-4' ] },
-		'mod': true,
-		'room-id': '58355428',
-		'subscriber': false,
-		'turbo': true,
-		'user-id': '58355428',
-		'user-type': 'mod',
-		'emotes-raw': '25:0-4',
-		'badges-raw': 'broadcaster/1,warcraft/horde',
-		'username': 'schmoopiie',
-		'message-type': 'action'
-	}
+/**
+ * Process chat message. Look for recognized commands and perform appropriate action(s).
+ * Ignore commands issued by self.
+ * @param channel channel from which the message originated
+ * @param userstate state object for user that sent the message
+ *		example userstate object
+		{
+			'badges': { 'broadcaster': '1', 'warcraft': 'horde' },
+			'color': '#FFFFFF',
+			'display-name': 'Schmoopiie',
+			'emotes': { '25': [ '0-4' ] },
+			'mod': true,
+			'room-id': '58355428',
+			'subscriber': false,
+			'turbo': true,
+			'user-id': '58355428',
+			'user-type': 'mod',
+			'emotes-raw': '25:0-4',
+			'badges-raw': 'broadcaster/1,warcraft/horde',
+			'username': 'schmoopiie',
+			'message-type': 'action'
+		}
+ * @param msg message that was sent
+ * @param isSelfMessage true if the message was sent by this bot, false otherwise
 */
 function handleMessage( channel, userstate, msg, isSelfMessage ) {
 	// Eliminate whitespace mistakes (e.g. "  !command      param")
@@ -83,10 +106,17 @@ function handleMessage( channel, userstate, msg, isSelfMessage ) {
 	}
 }
 
+/**
+ * Output message to channel or user
+ * Type of message to send is determined by userstate['message-type']
+ * @param channel channel from which the request originated
+ * @param msg message to send
+ * @param userstate userstate object
+ */
 function say( channel, msg, userstate ) {
 	switch( userstate['message-type'] ) {
 		case 'action':
-			client.action( channel, '/me ' + msg );
+			client.action( channel, msg );
 			break;
 		case 'chat':
 			client.say( channel, msg );
@@ -95,7 +125,8 @@ function say( channel, msg, userstate ) {
 			client.whisper( userstate['username'], msg );
 			break;
 		default:
-			console.log( 'Unknown message type: ' + userstate['message-type'] + '. Attempted to say: ' + msg );
+			console.log( 'Unknown message type: ' + userstate['message-type']
+				+ '. Attempted to say: ' + msg );
 			break;
 	}
 }
@@ -103,91 +134,55 @@ function say( channel, msg, userstate ) {
 /**
  * Load data from file
  *
- * @param file file from which to read
- * @param callback callback function, executed after success
+ * @param filename file from which to read
+ * @return object file contents parsed as JSON
  */
-function loadFromFile( filename, callback ) {
-    fs.readFile( filename, 'utf8', function( error, data ) {
-        if ( error ) {
-            throw error;
-        }
-        callback( JSON.parse( data ) );
-    });
+function loadJsonFromFile( filename ) {
+    return JSON.parse( FileSystem.readFileSync( filename, 'utf8' ) );
 }
 
 /**
  * Save data to file
  *
- * @param file file to write to
- * @param data fuck it we'll document you later
- * @param callback callback function, executed after success
+ * @param string filename file to write to
+ * @param object data json to write to file
  */
-function saveToFile( filename, data, callback ) {
-    fs.writeFile( filename, JSON.stringify( data ), function( error ) {
-        if ( error ) {
-            throw error;
-        }
-		callback( file );
-    });
+function saveJsonToFile( filename, data ) {
+    FileSystem.writeFileSync( filename, JSON.stringify( data ) );
 }
 
+/**
+ * Terminate application
+ */
 function quit() {
-    client.say(hostChannel, "Exiting application");
+    channels.forEach( function ( channel ) {
+		say(
+			channel,
+			'Terminating application. Please contact the developer (@J_Hobz)'
+			+ 'on Twitter if no warning was announced prior to termination.',
+			{
+				'message-type': 'chat'
+			}
+		);
+	} );
     client.disconnect();
     process.exit();
 }
 
-function saveChannels() {
-    fs.writeFile(channelsFile, JSON.stringify(channels), function(error) {
-        if (error) {
-            throw error;
-        }
-    });
-}
-
-function getLiveChannels(callback) {
-    var allChannels = Object.keys(channels);
-    var liveChannels = [];
-    var count = 0;
-    var parameters = [
-        'limit=100',
-        'stream_type=live',
-        'client_id=' + clientId
-    ];
-    _.each(allChannels, function(channel, index) {
-        request('https://api.twitch.tv/kraken/streams/' + channel + "?" + parameters.join("&"), function(error, response, body) {
-            body = JSON.parse(body);
-            if(body.stream) {
-                liveChannels.push(channel);
-            }
-
-            if(index === (allChannels.length - 1)) {
-                callback(liveChannels);
-            }
-        });
-    });
-}
-
+/**
+ * Start main application thread
+ */
 function run() {
-	loadChannels( CHANNELSFILE );
-	loadCommands( COMMANDSFILE );
+	channels = loadJsonFromFile( CHANNELSFILE ).channels;
+	commands = loadJsonFromFile( COMMANDSFILE ).commands;
 
-	// Try to init client. Wait if channels are not loaded.
-	var clientInterval = setInterval( function () {
-		if ( channels ) {
-			client = initClient( channels );
-			clearInterval( clientInterval );
-			client.connect();
-			client.on( 'logon', function () {
-				console.log('logon');
-			} );
-			client.on( 'message', handleMessage );
-		}
-	}, 10 );
+	client = initClient();
+	client.connect();
+	client.on( 'message', handleMessage );
 }
+
+process.on( 'SIGINT', function() {
+    quit();
+} );
 
 run();
-
-process.on('SIGTERM', function() {
-    quit();
-});
