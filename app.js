@@ -43,6 +43,11 @@ var irc = require('tmi.js'),
 	commands,
 
 /**
+ * Bad variable used as a hack at the moment
+ */
+	globals = {},
+
+/**
  * Permissions table
  */
 	permissions;
@@ -52,7 +57,9 @@ var irc = require('tmi.js'),
  * @return Promise
  */
 function initClient() {
-	var options = {
+	// TODO: Allow connecting under multiple identities
+	var identity = loadJsonFromFile( 'credentials.json' )[0],
+		options = {
 			options: {
 				debug: true,
 			},
@@ -60,13 +67,11 @@ function initClient() {
 				cluster: "aws",
 				reconnect: true
 			},
-			identity: {
-				username: 'guylove',
-				password: 'oauth:wb99bxkegr490kuko2eekhwa4kufwg'
-			},
+			identity: identity,
 			channels: channels,
 		},
 		client = new irc.client( options );
+
 		return client;
 }
 
@@ -113,15 +118,20 @@ function handleMessage( channel, userstate, msg, isSelfMessage ) {
 		commandAction = commands[command];
 
 	if ( hasPermission( user, commandAction ) ) {
-		if ( commandAction.action ) {
-			commandAction = commandAction.action;
-		}
-		if ( typeof commandAction === 'function' ) {
-			commandAction( split.splice( 1 ), function( message, data ) {
-				//client.say( channel, userstate["display-name"] + " - " + message + "." );
-			} );
+		if ( commandAction.type && commandAction.type === 'function' ) {
+			// FIXME: this is bad
+			globals[commandAction.action]( channel, userstate, msg );
 		} else {
-			say( channel, commandAction, userstate );
+			if ( commandAction.action ) {
+				commandAction = commandAction.action;
+			}
+			if ( typeof commandAction === 'function' ) {
+				commandAction( split.splice( 1 ), function( message, data ) {
+					//client.say( channel, userstate["display-name"] + " - " + message + "." );
+				} );
+			} else {
+				say( channel, commandAction, userstate );
+			}
 		}
 	}
 }
@@ -185,6 +195,7 @@ function loadJsonFromFile( filename ) {
 /**
  * Save data to file
  *
+				{ 'message-type': 'chat' }
  * @param string filename file to write to
  * @param object data json to write to file
  */
@@ -200,15 +211,97 @@ function quit() {
     channels.forEach( function ( channel ) {
 		say(
 			channel,
-			'Terminating application. Please contact the developer '
-			+ 'on Twitter if no warning was announced prior to termination.',
-			{
-				'message-type': 'chat'
-			}
+			// 'Terminating application. Please contact the developer '
+			// + 'on Twitter if no warning was announced prior to termination.',
+			'Application terminated.',
+			{ 'message-type': 'chat' }
 		);
 	} );
     client.disconnect();
     process.exit();
+}
+
+globals.uptime = function ( channel, userstate, message ) {
+	client.api( {
+		url: 'https://api.twitch.tv/kraken/streams/' + channel.substr(1),
+		headers: {
+			'Client-ID': '8ulj8xtb0zh31jp2met3iqo0uh3ec2p'
+		}
+	}, function ( err, res, body ) {
+		if ( err || !body )
+			return;
+
+		if ( !body.stream ) {
+			say(
+				channel,
+				channel.substr( 1 ) + '\'s stream is currently offline.',
+				userstate
+			);
+		} else {
+			var stream = body.stream,
+				startTime = new Date( stream['created_at'] ),
+				diff = new Date() - startTime;
+
+			say(
+				channel,
+				channel.substr( 1 ) + ' has been live for '
+					+ Math.floor( diff / 1000 / 60 / 60 ) + 'h'
+					+ Math.floor( diff / 1000 / 60 % 60 ) + 'm'
+					+ Math.floor( diff / 1000 % 60 ) + 's.',
+				userstate
+			);
+		}
+	} );
+}
+
+globals.addcommand = function ( channel, userstate, message ) {
+	var split = message.match( /\S+/g ) || [],
+		command = split[1],
+		msg = split.slice( 2, split.length ).join( ' ' );
+
+	if ( commands[command] ) {
+		say(
+			channel,
+			'That is already a command, please select a different name.',
+			userstate
+		);
+	} else {
+		commands[command] = msg;
+		saveJsonToFile( COMMANDSFILE, commands );
+	}
+}
+
+globals.removecommand = function ( channel, userstate, message ) {
+	var split = message.match( /\S+/g ) || [],
+		command = split[1];
+
+	if ( commands[command] ) {
+		delete commands[command];
+		saveJsonToFile( COMMANDSFILE, commands );
+	} else {
+		say(
+			channel,
+			'That is not a command, please select a different name. You can use !commands to see the list of commands.',
+			userstate
+		);
+	}
+}
+
+globals.commands = function ( channel, userstate, message ) {
+	var user = userstate.username,
+		output = [];
+
+	Object.keys( commands ).forEach( function ( command ) {
+		if ( command !== 'commands' && hasPermission( user, commands[command] ) ) {
+			output.push( '!' + command );
+		}
+	} );
+
+	say(
+		channel,
+		output.join( ', ' ),
+		userstate
+	);
 }
 
 /**
@@ -217,6 +310,27 @@ function quit() {
 function run() {
 	channels = loadJsonFromFile( CHANNELSFILE );
 	commands = loadJsonFromFile( COMMANDSFILE );
+
+	// FIXME: Make all this less gross
+	commands.uptime = {
+		type: 'function',
+		action: 'uptime'
+	};
+	commands.addcommand = {
+		type: 'function',
+		level: 1,
+		action: 'addcommand'
+	};
+	commands.removecommand = {
+		type: 'function',
+		level: 0,
+		action: 'addcommand'
+	};
+	commands.commands = {
+		type: 'function',
+		action: 'commands'
+	};
+
 	permissions = loadJsonFromFile( PERMISSIONSFILE );
 
 	client = initClient();
