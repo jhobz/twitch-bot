@@ -61,7 +61,7 @@ function initClient() {
 	var identity = loadJsonFromFile( 'credentials.json' )[0],
 		options = {
 			options: {
-				debug: true,
+				debug: false,
 			},
 			connection: {
 				cluster: "aws",
@@ -324,7 +324,7 @@ function run() {
 	commands.removecommand = {
 		type: 'function',
 		level: 0,
-		action: 'addcommand'
+		action: 'removecommand'
 	};
 	commands.commands = {
 		type: 'function',
