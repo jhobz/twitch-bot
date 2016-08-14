@@ -242,15 +242,15 @@ function saveJsonToFile( filename, data ) {
  * Terminate application
  */
 function quit() {
-    //channels.forEach( function ( channel ) {
-	//	say(
-	//		channel,
-	//		// 'Terminating application. Please contact the developer '
-	//		// + 'on Twitter if no warning was announced prior to termination.',
-	//		'Application terminated.',
-	//		{ 'message-type': 'chat' }
-	//	);
-	//} );
+    channels.forEach( function ( channel ) {
+		say(
+			channel,
+			// 'Terminating application. Please contact the developer '
+			// + 'on Twitter if no warning was announced prior to termination.',
+			'Application terminated.',
+			{ 'message-type': 'chat' }
+		);
+	} );
     client.disconnect();
     process.exit();
 }
@@ -496,7 +496,6 @@ globals.recordMatch = function ( channel, userstate, message ) {
 		userstate
 	);
 };
-console.log('done registering the two functions that are fucking up');
 
 function refreshMatchData() {
 	matches = loadJsonFromFile( MATCHESFILE );
