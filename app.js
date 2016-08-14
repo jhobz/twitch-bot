@@ -23,9 +23,19 @@ var irc = require('tmi.js'),
 	COMMANDSFILE = 'commands.json',
 
 /**
+ * Location of table of past match data.
+ */
+	MATCHESFILE = 'data/matches.json',
+
+/**
  * Location of permissions table.
  */
 	PERMISSIONSFILE = 'permissions.json',
+
+/**
+ * Location of predictions table.
+ */
+	PREDICTIONSFILE = 'data/predictions.json',
 
 /**
  * List of channels to which to connect.
@@ -48,9 +58,34 @@ var irc = require('tmi.js'),
 	globals = {},
 
 /**
+ * Whether a match is in progress
+ */
+	isMatchInProgress = false,
+
+/**
+ * Data of last match
+ */
+	lastMatch,
+
+/**
+ * Cached matches data
+ */
+	matches,
+
+/**
  * Permissions table
  */
-	permissions;
+	permissions,
+
+/**
+ * Cached prediction data
+ */
+	predictions,
+
+/**
+ * Cached score
+ */
+	score;
 
 /**
  * Initialize the tmi client and connect to channels.
@@ -61,7 +96,7 @@ function initClient() {
 	var identity = loadJsonFromFile( 'credentials.json' )[0],
 		options = {
 			options: {
-				debug: false,
+				debug: true,
 			},
 			connection: {
 				cluster: "aws",
@@ -173,7 +208,7 @@ function say( channel, msg, userstate ) {
 			client.say( channel, msg );
 			break;
 		case 'whisper':
-			client.whisper( userstate['username'], msg );
+			client.whisper( userstate.username, msg );
 			break;
 		default:
 			console.error( 'Unknown message type: ' + userstate['message-type']
@@ -195,7 +230,6 @@ function loadJsonFromFile( filename ) {
 /**
  * Save data to file
  *
-				{ 'message-type': 'chat' }
  * @param string filename file to write to
  * @param object data json to write to file
  */
@@ -208,15 +242,15 @@ function saveJsonToFile( filename, data ) {
  * Terminate application
  */
 function quit() {
-    channels.forEach( function ( channel ) {
-		say(
-			channel,
-			// 'Terminating application. Please contact the developer '
-			// + 'on Twitter if no warning was announced prior to termination.',
-			'Application terminated.',
-			{ 'message-type': 'chat' }
-		);
-	} );
+    //channels.forEach( function ( channel ) {
+	//	say(
+	//		channel,
+	//		// 'Terminating application. Please contact the developer '
+	//		// + 'on Twitter if no warning was announced prior to termination.',
+	//		'Application terminated.',
+	//		{ 'message-type': 'chat' }
+	//	);
+	//} );
     client.disconnect();
     process.exit();
 }
@@ -252,7 +286,7 @@ globals.uptime = function ( channel, userstate, message ) {
 			);
 		}
 	} );
-}
+};
 
 globals.addcommand = function ( channel, userstate, message ) {
 	var split = message.match( /\S+/g ) || [],
@@ -269,7 +303,7 @@ globals.addcommand = function ( channel, userstate, message ) {
 		commands[command] = msg;
 		saveJsonToFile( COMMANDSFILE, commands );
 	}
-}
+};
 
 globals.removecommand = function ( channel, userstate, message ) {
 	var split = message.match( /\S+/g ) || [],
@@ -285,7 +319,7 @@ globals.removecommand = function ( channel, userstate, message ) {
 			userstate
 		);
 	}
-}
+};
 
 globals.commands = function ( channel, userstate, message ) {
 	var user = userstate.username,
@@ -302,6 +336,213 @@ globals.commands = function ( channel, userstate, message ) {
 		output.join( ', ' ),
 		userstate
 	);
+};
+
+globals.score = function ( channel, userstate, message ) {
+	if ( !matches || !matches._expiry || matches._expiry.getTime() < ( new Date() ).getTime() ) {
+		refreshMatchData();
+	}
+
+	if ( !score ) {
+		score = '';
+
+		var runnerScores = matches[matches.length - 1].results.scores;
+		for ( var runner in runnerScores ) {
+			score += runner + ': ' + runnerScores[runner] + ', ';
+		}
+
+		score = score.substr( 0, score.length - 2 );
+	}
+
+	say(
+		channel,
+		score,
+		userstate
+	);
+};
+
+globals.points = function ( channel, userstate, message ) {
+	var split = message.match( /\S+/g ) || [],
+		user = split.length > 1 ? split[1] : userstate.username,
+		output;
+
+	if ( !predictions || !predictions._expiry || predictions._expiry.getTime() < ( new Date() ).getTime() ) {
+		refreshPredictionData();
+	}
+
+	if ( !predictions[user] ) {
+		output = 'No prediction data associated with '
+			+ user
+			+ '. You can predict the winner of this week with "!predict hobz" or "!predict spike"';
+	} else {
+		var isOther = user === userstate.username,
+			isPlural = predictions[user].score !== 1;
+		output = ( isOther ? 'You have ' : user + ' has ' )
+			+ predictions[user].score + ' point'
+			+ ( isPlural ? 's.' : '.' );
+	}
+
+	say(
+		channel,
+		output,
+		userstate
+	);
+};
+
+globals.predict = function ( channel, userstate, message ) {
+	if ( isMatchInProgress ) {
+		say(
+			channel,
+			'Predictions lock at the beginning of each match and reopen at the end of the stream.',
+			userstate
+		);
+		return;
+	}
+
+	if ( !predictions ) {
+		refreshPredictionData();
+	}
+
+	var currentWeek = matches.length + 1,
+		split = message.match( /\S+/g ) || [],
+		prediction = split[1],
+		user = userstate.username,
+		output;
+
+	if ( prediction && prediction.indexOf( 'spike' ) >= 0 ) {
+		prediction = 'spike';
+	} else if ( prediction && prediction.indexOf( 'hobz' ) >= 0 ) {
+		prediction = 'hobz';
+	} else {
+		prediction = 'error';
+		output = user
+			+ ': Your prediction has not been logged. Please predict either "spike" or "hobz".';
+	}
+
+	if ( !output ) {
+		output = user + ': Your prediction of ' + prediction + ' has been saved.';
+	}
+
+	if ( !predictions[user] ) {
+		predictions[user] = {
+			score: 0,
+			predictions: {}
+		};
+	}
+
+	predictions[user].predictions[currentWeek] = prediction;
+	saveJsonToFile( PREDICTIONSFILE, predictions );
+
+	say(
+		channel,
+		output,
+		userstate
+	);
+};
+
+globals.startMatch = function ( channel, userstate, message ) {
+	if ( isMatchInProgress ) {
+		return;
+	}
+
+	isMatchInProgress = true;
+	say(
+		channel,
+		'The race is underway and predictions have been locked. Don\'t forget to root for '
+			+ 'TeamHobz or TeamSpike in chat! LET THE BATTLE BEGIN!',
+		userstate
+	);
+};
+
+globals.recordMatch = function ( channel, userstate, message ) {
+	if ( !isMatchInProgress ) {
+		return;
+	}
+
+	refreshMatchData();
+	// TODO: Calculate points in here somewhere.
+	refreshPredictionData();
+
+	var date = new Date(),
+		split = message.match( /\S+/g ) || [],
+		game = split[1].replace( '_', ' ' ),
+		winner = split[2],
+		punishment = split.slice( 3, split.length ).join( ' ' ),
+		lastScores = lastMatch.results.scores;
+
+	var match = {
+		date: date,
+		game: game,
+		punishment: punishment,
+		results: {
+			scores: {
+				hobz: lastScores.hobz,
+				spike: lastScores.spike
+			},
+			times: [],
+			winner: winner
+		}
+	};
+
+	match.results.scores[winner]++;
+	matches.push( match );
+	lastMatch = match;
+	saveJsonToFile( MATCHESFILE, matches );
+	isMatchInProgress = false;
+
+	say(
+		channel,
+		'Match recorded. Predictions are now available for the next match.',
+		userstate
+	);
+};
+console.log('done registering the two functions that are fucking up');
+
+function refreshMatchData() {
+	matches = loadJsonFromFile( MATCHESFILE );
+	lastMatch = matches[matches.length - 1];
+	var lastMatchDate = new Date( lastMatch.date );
+
+	// This feels dirty... but expire cache day after next match
+	var expiry = new Date(
+		lastMatchDate.getFullYear(),
+		lastMatchDate.getMonth(),
+		lastMatchDate.getDate() + 8
+	);
+
+	while ( expiry.getTime() < (new Date()).getTime() ) {
+		expiry = new Date(
+			expiry.getFullYear(),
+			expiry.getMonth(),
+			expiry.getDate() + 7
+		);
+	}
+
+	matches._expiry = expiry;
+}
+
+function refreshPredictionData() {
+	refreshMatchData();
+
+	predictions = loadJsonFromFile( PREDICTIONSFILE );
+	var lastMatchDate = new Date( lastMatch.date );
+
+	// This feels dirty... but expire cache day after next match
+	var expiry = new Date(
+		lastMatchDate.getFullYear(),
+		lastMatchDate.getMonth(),
+		lastMatchDate.getDate() + 8
+	);
+
+	while ( expiry.getTime() < (new Date()).getTime() ) {
+		expiry = new Date(
+			expiry.getFullYear(),
+			expiry.getMonth(),
+			expiry.getDate() + 7
+		);
+	}
+
+	predictions._expiry = expiry;
 }
 
 /**
@@ -329,6 +570,28 @@ function run() {
 	commands.commands = {
 		type: 'function',
 		action: 'commands'
+	};
+	commands.score = {
+		type: 'function',
+		action: 'score'
+	};
+	commands.points = {
+		type: 'function',
+		action: 'points'
+	};
+	commands.predict = {
+		type: 'function',
+		action: 'predict'
+	};
+	commands.startmatch = {
+		type: 'function',
+		level: 1,
+		action: 'startMatch'
+	};
+	commands.recordmatch = {
+		type: 'function',
+		level: 0,
+		action: 'recordMatch'
 	};
 
 	permissions = loadJsonFromFile( PERMISSIONSFILE );
