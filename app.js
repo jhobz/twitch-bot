@@ -96,7 +96,7 @@ function initClient() {
 	var identity = loadJsonFromFile( 'credentials.json' )[0],
 		options = {
 			options: {
-				debug: true,
+				debug: false,
 			},
 			connection: {
 				cluster: "aws",
@@ -234,7 +234,7 @@ function loadJsonFromFile( filename ) {
  * @param object data json to write to file
  */
 function saveJsonToFile( filename, data ) {
-    FileSystem.writeFileSync( filename, JSON.stringify( data ) );
+    FileSystem.writeFileSync( filename, JSON.stringify( data ) + '\n' );
 }
 
 
@@ -420,7 +420,9 @@ globals.predict = function ( channel, userstate, message ) {
 	}
 
 	if ( !output ) {
-		output = user + ': Your prediction of ' + prediction + ' has been saved.';
+		output = user
+			+ ': Your prediction of ' + prediction
+			+ ' for week ' + currentWeek + ' has been saved.';
 	}
 
 	if ( !predictions[user] ) {
@@ -460,7 +462,6 @@ globals.recordMatch = function ( channel, userstate, message ) {
 	}
 
 	refreshMatchData();
-	// TODO: Calculate points in here somewhere.
 	refreshPredictionData();
 
 	var date = new Date(),
@@ -488,6 +489,7 @@ globals.recordMatch = function ( channel, userstate, message ) {
 	matches.push( match );
 	lastMatch = match;
 	saveJsonToFile( MATCHESFILE, matches );
+	updatePoints( winner );
 	isMatchInProgress = false;
 
 	say(
@@ -542,6 +544,18 @@ function refreshPredictionData() {
 	}
 
 	predictions._expiry = expiry;
+}
+
+function updatePoints( winner ) {
+	// FIXME: Everything
+	var week = matches.length;
+	for ( var user in predictions ) {
+		// FIXME: Find a way to not hard-code this check
+		if ( user !== '_expiry' && predictions[user].predictions[week] === winner ) {
+			predictions[user].score++;
+		}
+	}
+	saveJsonToFile( PREDICTIONSFILE, predictions );
 }
 
 /**
