@@ -1,0 +1,6 @@
+{
+	"superUser": 0,
+	"anAdmin": 1,
+	"anotherAdmin": 1,
+	"bannedUser": -1
+}
