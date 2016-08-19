@@ -145,6 +145,7 @@ function handleMessage( channel, userstate, msg, isSelfMessage ) {
 		isSelfMessage
 		|| permissions[user] < 0
 		|| !split.length
+		|| split[0].charAt( 0 ) !== '!'
 	) {
 		return;
 	}
