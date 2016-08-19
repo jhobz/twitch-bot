@@ -4,13 +4,13 @@
  * node package tmi.js
  * Used for interacting with Twitch servers and chat.
  */
-var irc = require('tmi.js'),
+var irc = require( 'tmi.js' ),
 
 /**
  * node package fs
  * Used for reading from and writing to filesystem.
  */
-	FileSystem = require('fs'),
+	FileSystem = require( 'fs' ),
 
 /**
  * Location of list of channels to which to connect.
@@ -23,7 +23,7 @@ var irc = require('tmi.js'),
 	COMMANDSFILE = '../data/commands.json',
 
 /**
- * Location of list of commands to load.
+ * Location of bot credentials.
  */
 	CREDENTIALSFILE = '../data/credentials.json',
 
@@ -142,7 +142,6 @@ function initClient() {
  *        Note: Is false if message was sent from account but not by bot
 */
 function handleMessage( channel, userstate, msg, isSelfMessage ) {
-	msg = msg.toLowerCase();
 	// Eliminate whitespace mistakes (e.g. "  !command      param")
 	var split = msg.match( /\S+/g ) || [],
 		user = userstate['username'];
@@ -412,7 +411,7 @@ globals.predict = function ( channel, userstate, message ) {
 
 	var currentWeek = matches.length + 1,
 		split = message.match( /\S+/g ) || [],
-		prediction = split[1],
+		prediction = split[1].toLowerCase(),
 		user = userstate.username,
 		output;
 
@@ -618,6 +617,15 @@ function run() {
 
 	client = initClient();
 	client.connect();
+	client.once( 'join', function ( channel, user, isSelf ) {
+		if ( isSelf ) {
+			say(
+				channel,
+				'Application started.',
+				{ 'message-type': 'chat' }
+			);
+		}
+	} );
 	client.on( 'message', handleMessage );
 }
 
