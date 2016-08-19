@@ -137,6 +137,7 @@ function initClient() {
  *        Note: Is false if message was sent from account but not by bot
 */
 function handleMessage( channel, userstate, msg, isSelfMessage ) {
+	msg = msg.toLowerCase();
 	// Eliminate whitespace mistakes (e.g. "  !command      param")
 	var split = msg.match( /\S+/g ) || [],
 		user = userstate['username'];
