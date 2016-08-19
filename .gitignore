@@ -1,8 +1,4 @@
 data/
 node_modules/
-credentials.json
-channels.json
-commands.json
-permissions.json
 flowchart
 

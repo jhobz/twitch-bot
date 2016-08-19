@@ -15,27 +15,27 @@ var irc = require('tmi.js'),
 /**
  * Location of list of channels to which to connect.
  */
-	CHANNELSFILE = 'channels.json',
+	CHANNELSFILE = '../data/channels.json',
 
 /**
  * Location of list of commands to load.
  */
-	COMMANDSFILE = 'commands.json',
+	COMMANDSFILE = '../data/commands.json',
 
 /**
  * Location of table of past match data.
  */
-	MATCHESFILE = 'data/matches.json',
+	MATCHESFILE = '../data/matches.json',
 
 /**
  * Location of permissions table.
  */
-	PERMISSIONSFILE = 'permissions.json',
+	PERMISSIONSFILE = '../data/permissions.json',
 
 /**
  * Location of predictions table.
  */
-	PREDICTIONSFILE = 'data/predictions.json',
+	PREDICTIONSFILE = '../data/predictions.json',
 
 /**
  * List of channels to which to connect.
