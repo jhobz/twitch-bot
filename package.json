@@ -1,23 +1,24 @@
 {
-	"name": "twitch-bot",
-	"version": "0.1.0",
-	"description": "A simple Twitch command bot",
-	"main": "app.js",
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
-	},
-	"author": "Jeff \"JHobz\" Hobson",
-	"license": "MIT",
-	"dependencies": {
-		"tmi.js": "^1.1.1"
-	},
-	"devDependencies": {
-		"grunt": "~0.4.1",
-		"grunt-contrib-qunit": "^1.2.0",
-		"grunt-contrib-watch": "1.0.0"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/jhobz/twitch-bot.git"
-	}
+  "name": "twitch-bot",
+  "version": "0.1.0",
+  "description": "A simple Twitch command bot",
+  "main": "app.js",
+  "scripts": {
+    "test": "grunt mochaTest"
+  },
+  "author": "Jeff \"JHobz\" Hobson",
+  "license": "MIT",
+  "dependencies": {
+    "tmi.js": "^1.1.1"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "grunt": "^1.0.1",
+    "grunt-mocha-test": "^0.12.7",
+    "mocha": "^3.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhobz/twitch-bot.git"
+  }
 }

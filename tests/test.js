@@ -1,9 +1,12 @@
-QUnit.module( 'Basic tests' );
+'use strict';
 
-// TODO: Add a real test
-QUnit.test( 'truthy', function ( assert ) {
-	assert.expect( 3 );
-	assert.ok( true, 'true is truthy' );
-	assert.equal( 1, true, '1 is truthy' );
-	assert.notEqual( 0, true, '0 is NOT truthy' );
+const chai = require( 'chai' ),
+	expect = chai.expect;
+
+describe( 'Array', function () {
+	describe( '#indexOf()', function () {
+		it( 'should return -1 when the value is not present', function () {
+			expect( [ 1, 2, 3 ].indexOf( 4 ) ).to.equal( -1 );
+		} );
+	} );
 } );
