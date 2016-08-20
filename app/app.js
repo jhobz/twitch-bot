@@ -23,6 +23,11 @@ var irc = require('tmi.js'),
 	COMMANDSFILE = '../data/commands.json',
 
 /**
+ * Location of list of commands to load.
+ */
+	CREDENTIALSFILE = '../data/credentials.json',
+
+/**
  * Location of table of past match data.
  */
 	MATCHESFILE = '../data/matches.json',
@@ -93,7 +98,7 @@ var irc = require('tmi.js'),
  */
 function initClient() {
 	// TODO: Allow connecting under multiple identities
-	var identity = loadJsonFromFile( 'credentials.json' )[0],
+	var identity = loadJsonFromFile( CREDENTIALSFILE )[0],
 		options = {
 			options: {
 				debug: false,
