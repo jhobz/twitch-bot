@@ -473,7 +473,7 @@ globals.recordMatch = function ( channel, userstate, message ) {
 
 	var date = new Date(),
 		split = message.match( /\S+/g ) || [],
-		game = split[1].replace( '_', ' ' ),
+		game = split[1].replace( /_/g, ' ' ),
 		winner = split[2],
 		punishment = split.slice( 3, split.length ).join( ' ' ),
 		lastScores = lastMatch.results.scores;
